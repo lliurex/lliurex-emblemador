@@ -1,0 +1,183 @@
+#!/bin/bash
+EMBLEM_CMD=`type -fp gvfs-set-attribute`
+if [ "x$EMBLEM_CMD" = "x" ]; then
+    echo "Package gvfs-bin not found, aborting..."
+    exit 1
+fi
+
+EMBLEM_SRC="shared-symbolic"
+
+if [ "x$1" = "xclear" ];then
+    EMBLEM_SRC="none"
+fi
+
+# Test if we are on a server
+TIPO=""
+
+test_server=`lliurex-version|grep server|wc -l`
+if [ $test_server -gt 0 ]; then
+    TIPO=server
+fi
+
+if [ "x$TIPO" = "x" ]; then
+
+# Server always is PESADO
+#
+# Calculation of boot type:
+# PESADO (mounted folders with bind, into /run), 
+# LIGERO (mounted folders with bind,into /net/server-sync), 
+# SEMI-LIGERO (linked dirs from /net/server-sync).
+
+#test_fat=`mount |grep -i desktop|egrep '^/run'|wc -l`
+test_semi=`ls -l ${HOME}|grep -i desktop|egrep '^lrwx'|wc -l`
+test_fat=`findmnt -l |grep -i desktop|egrep '^/run'|wc -l`
+#test_lig=`mount |grep -i desktop|egrep '^/net/server'|wc -l`
+test_lig=`finmnt -l |grep -i desktop|egrep '^/net/server'|wc -l`
+
+if [ $test_fat -gt 0 ]; then
+    TIPO=fat$TIPO
+fi
+if [ $test_semi -gt 0 ]; then
+    TIPO=semi$TIPO
+fi
+if [ $test_lig -gt 0 ]; then
+    TIPO=lig$TIPO
+fi
+
+fi
+
+echo $TIPO
+
+if [ "x$TIPO" != "xfat" -a "x$TIPO" != "xsemi" -a "x$TIPO" != "xlig" -a "x$TIPO" != "xserver" ]; then
+    echo "Error type detected, aborting... "
+    exit 1
+fi
+# Calculation for teachers or students or local user
+
+US=""
+test_local=`cat /etc/passwd|grep ${HOME}|wc -l`
+test_local2=`mount |grep '/dev/nbd0 on /rofs'|wc -l`
+
+if [ $test_local -gt 0 -a $test_local2 -eq 0 ]; then
+    US=local
+else
+#    test_student=`mount|grep -i desktop|grep -i student|wc -l`
+    test_student=`findmnt -l |grep -i desktop|grep -i student|wc -l`
+    if [ $test_student -gt 0 ]; then
+	US=students
+    else
+#	test_teacher=`mount|grep -i desktop|grep -i teacher|wc -l`
+	test_teacher=`findmnt -l|grep -i desktop|grep -i teacher|wc -l`
+	if [ $test_teacher -gt 0 ]; then
+	    US=teachers
+	fi
+	# if type = semi, we've to test the link not the mount
+	if [ $TIPO = 'semi' ]; then
+	    test_student=`ls -l ${HOME}|grep -i desktop|egrep '^lrwx'|grep -i student|wc -l`
+	    if [ $test_student -gt 0 ]; then
+		US=students
+	    else
+		test_teacher=`ls -l ${HOME}|grep -i desktop|egrep '^lrwx'|grep -i teacher|wc -l`
+		if [ $test_teacher -gt 0 ]; then
+		    US=teachers
+		fi
+	    fi
+	fi
+    fi
+fi
+
+if [ "x$TIPO" = "x" -o "x$US" = "x" ]; then
+    echo $TIPO - $US
+    echo "Error user detected, aborting..."
+    exit 1
+fi
+
+
+PARAMS_CMD="-t stringv metadata::emblems"
+
+# Calculation for dirs
+DIRS=""
+if [ -f ${HOME}/.config/user-dirs.created ]; then
+    . ${HOME}/.config/user-dirs.created
+fi
+
+USERNAME=`basename ${HOME}`
+
+echo Detected $USERNAME type $US into $TIPO
+
+if [ "$US" = "teachers" ]; then
+	case "$TIPO" in
+	    fat)
+		DIRS="$DIRS /run/$USERNAME/home/students"
+		DIRS="$DIRS ${HOME}/alum"
+		DIRS="$DIRS /run/$USERNAME/teachers_share"
+		DIRS="$DIRS ${HOME}/$TOKEN_SHARETEACHERS"
+			    ;;
+	    semi)
+		DIRS="$DIRS /net/server-sync/home/students"
+		DIRS="$DIRS ${HOME}/alum"
+		DIRS="$DIRS /net/server-sync/teachers_share"
+		DIRS="$DIRS ${HOME}/$TOKEN_SHARETEACHERS"
+			    ;;
+	    lig | server)
+		DIRS="$DIRS /net/server-sync/home/students"
+		DIRS="$DIRS ${HOME}/alum"
+		DIRS="$DIRS /net/server-sync/teachers_share"
+		DIRS="$DIRS ${HOME}/$TOKEN_SHARETEACHERS"
+	    ;;
+	esac
+fi
+if [ "$US" != "local" ]; then
+	case "$TIPO" in
+	    fat)
+		DIRS="$DIRS /run/$USERNAME/share"
+		DIRS="$DIRS ${HOME}/$TOKEN_SHARE"
+		DIRS="$DIRS /run/$USERNAME/groups_share"
+		DIRS="$DIRS ${HOME}/$TOKEN_GROUPSSHARE"
+		DIRS="$DIRS /run/$USERNAME/home/$US/$USERNAME/Documents"
+		DIRS="$DIRS ${HOME}/$TOKEN_DOCUMENTS"
+		DIRS="$DIRS /run/$USERNAME/home/$US/$USERNAME/Desktop"
+		DIRS="$DIRS ${HOME}/$TOKEN_DESKTOP"
+	    ;;
+	    semi)
+		DIRS="$DIRS /net/server-sync/share"
+		DIRS="$DIRS ${HOME}/$TOKEN_SHARE"
+		DIRS="$DIRS /net/server-sync/groups_share"
+		DIRS="$DIRS ${HOME}/$TOKEN_GROUPSSHARE"
+		DIRS="$DIRS /net/server-sync/home/$US/$USERNAME/Documents"
+		DIRS="$DIRS ${HOME}/$TOKEN_DOCUMENTS"
+		DIRS="$DIRS /net/server-sync/home/$US/$USERNAME/Desktop"
+		DIRS="$DIRS ${HOME}/$TOKEN_DESKTOP"
+	    ;;
+	    lig | server)
+		DIRS="$DIRS /net/server-sync/share"
+		DIRS="$DIRS ${HOME}/$TOKEN_SHARE"
+		DIRS="$DIRS /net/server-sync/groups_share"
+		DIRS="$DIRS ${HOME}/$TOKEN_GROUPSSHARE"
+		DIRS="$DIRS /net/server-sync/home/$US/$USERNAME/Documents"
+		DIRS="$DIRS ${HOME}/$TOKEN_DOCUMENTS"
+		DIRS="$DIRS /net/server-sync/home/$US/$USERNAME/Desktop"
+		DIRS="$DIRS ${HOME}/$TOKEN_DESKTOP"
+	    ;;
+	esac
+fi
+
+# Execution
+i=0
+for one_dir in $DIRS; do 
+    if [ -d $one_dir -o -h $one_dir ]; then
+	i=$(($i+1))
+        CMD="$EMBLEM_CMD $one_dir $PARAMS_CMD $EMBLEM_SRC"
+	$CMD
+	if [ $? -eq 0 ]; then
+	    echo $i: OK! $one_dir 
+	else
+	    echo $i: FAIL! $one_dir
+	fi
+	
+    fi
+done;
+if [ $i -eq 0 ]; then
+    echo "Nothing to do"
+fi
+exit 0

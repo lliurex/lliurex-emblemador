@@ -1,0 +1,7 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=LliureX Automatic Emblem
+Comment=LliureX Automatic Emblem
+Exec=/usr/bin/emblemador
+Terminal=false
+Type=Application
