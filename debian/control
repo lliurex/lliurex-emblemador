@@ -1,0 +1,15 @@
+Source: lliurex-emblemador
+Section: admin
+Priority: optional
+Maintainer: Equipo LliureX <lliurex@gva.es>
+Uploaders: M.Angel Juan <m.angel.juan@gmail.com>, Raul Rodrigo Segura <lliurex_devel3@edu.gva.es>, Hector Garcia Huerta <lliurex_devel1@edu.gva.es>, Daniel Duran Vecino <daduve@gmail.com>, Juanma Navarro <juanma1980@gmail.com>, Juan Ramon Pelegrina <juapesai@hotmail.com>, Enrique Medina Gremaldos <lliurex_devel4@edu.gva.es>
+Build-Depends: debhelper (>= 7.0)
+Standards-Version: 4.1.4
+Homepage: http://lliurex.net
+
+Package: lliurex-emblemador
+Architecture: all
+Depends: ${misc:Depends} gvfs-bin
+Description: LliureX Automatic emblem shared folders
+
+
